@@ -14,14 +14,42 @@ mod vga;
 // naked function + some inline asm, but this seems much more straight forward.
 global_asm!(include_str!("boot.s"));
 
+#[repr(C, packed)]
+#[derive(Debug)]
+pub struct MultibootInfo {
+    pub flags: u32,
+    pub mem_lower: u32,
+    pub mem_upper: u32,
+    pub boot_device: u32,
+    pub cmdline: u32,
+    pub mods_count: u32,
+    pub mods_addr: u32,
+    pub syms: [u32; 4],
+    pub mmap_length: u32,
+    pub mmap_addr: u32,
+}
 
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main() -> ! {
-    println!("hello {}\n", 32);
+pub extern "C" fn kernel_main(multiboot_info_ptr: u32) -> ! {
+    let mb_info = unsafe { &*(multiboot_info_ptr as *const MultibootInfo) };
+
+    // Copy packed fields into aligned locals
+    let flags = mb_info.flags;
+    let mem_lower = mb_info.mem_lower;
+    let mem_upper = mb_info.mem_upper;
+    let boot_device = mb_info.boot_device;
+    let mmap_length = mb_info.mmap_length;
+    let mmap_addr = mb_info.mmap_addr;
+
+    println!(
+        "flags: {}\nMemory lower: {}\nMemory upper: {}\nBoot device: {}\nmmap_length: {}\nmmap_addr: {}",
+        flags, mem_lower, mem_upper, boot_device, mmap_length, mmap_addr
+    );
+
     loop {}
 }
 
-/// This function is called on panic.
+// This function is called on panic.
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
