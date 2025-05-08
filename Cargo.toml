@@ -1,0 +1,12 @@
+[package]
+name = "myos"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+spin = "0.5.2"
+
+[dependencies.lazy_static]
+version = "1.0"
+features = ["spin_no_std"]
+
