@@ -1,0 +1,4 @@
+* Links:
+[[https://cirosantilli.com/x86-paging]]
+[[https://www.youtube.com/watch?v=pcvKrvEJRgg]]
+[[https://wiki.osdev.org/Paging]]
