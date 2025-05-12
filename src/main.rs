@@ -4,15 +4,23 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 #[warn(unused_imports)]
 
+
 use core::arch::global_asm;
 use core::panic::PanicInfo;
 
 mod vga;
+mod allocator;
+
+extern crate alloc;
+
+use alloc::vec::Vec;
+
 
 // Include boot.s which defines _start as inline assembly in main. This allows us to do more fine
 // grained setup than if we used a naked _start function in rust. Theoretically we could use a
 // naked function + some inline asm, but this seems much more straight forward.
 global_asm!(include_str!("boot.s"));
+
 
 #[repr(C, packed)]
 #[derive(Debug)]
@@ -29,48 +37,59 @@ pub struct MultibootInfo {
     pub mmap_addr: u32,
 }
 
+#[repr(C, packed)]
+#[derive(Debug)]
 struct MultibootMmapEntry {
     size: u32,
-    addr: u32,
-    len: u32,
+    addr: u64,
+    len: u64,
     typ: u32
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main(multiboot_info_ptr: u32, multiboot_magic_ptr: u32) -> ! {
-    let mb_info = unsafe { &*(multiboot_info_ptr as *const MultibootInfo) };
-
-    let mut mmap_addr = mb_info.mmap_addr;
-    let mmap_length = mb_info.mmap_length;
+pub extern "C" fn kernel_main(mb_info: *const MultibootInfo, multiboot_magic_ptr: u32) -> ! {
+    let mem_lower = unsafe { (*mb_info).mem_lower };
+    let mem_upper = unsafe { (*mb_info).mem_upper };
+    let mut mmap_addr = unsafe { (*mb_info).mmap_addr };
+    let mmap_length = unsafe { (*mb_info).mmap_length };
     let mmap_end = mmap_addr + mmap_length;
 
     println!("Magic Number: {:#x}", multiboot_magic_ptr);
-
     println!(
-        "mmap_length: {}\nmmap_addr: {:#x}", mmap_length, mmap_addr
+        "mem_lower: {}kb\nmem_upper: {}kb\nmmap_length: {}\nmmap_addr: {:#x}\nmmap_end: {}",
+        mem_lower, mem_upper, mmap_length, mmap_addr, mmap_end
     );
 
     while mmap_addr < mmap_end {
-        let entry = unsafe { &*(mmap_addr as *const MultibootMmapEntry) };
+	let entry = unsafe { &*(mmap_addr as *const MultibootMmapEntry) };
 
-        println!(
-            "size: {} addr: {:#x} len: {} typ: {:#x}",
-            entry.size,
-            entry.addr,
-            entry.len,
-            entry.typ
-        );
+	// Copy each field to a local variable to avoid unaligned reference
+	let size = core::ptr::addr_of!(entry.size);
+	let addr = core::ptr::addr_of!(entry.addr);
+	let len  = core::ptr::addr_of!(entry.len);
+	let typ  = core::ptr::addr_of!(entry.typ);
 
-        mmap_addr += entry.size + 4; // add size of `size` field
+	println!(
+            "size: {} addr: {:#x} len: {} typ: {}",
+            unsafe { size.read_unaligned() },
+	    unsafe { addr.read_unaligned() },
+	    unsafe { len.read_unaligned() / 1024 },
+	    unsafe { typ.read_unaligned() }
+	);
+
+	// Move to next entry (size doesn't include size field itself)
+	mmap_addr += entry.size + 4;
     }
 
     loop {}
 }
 
 
+
 // This function is called on panic.
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
+    println!("We panicked!");
     loop {}
 }
 

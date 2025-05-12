@@ -10,4 +10,4 @@ cargo build
 # cp grub.cfg isodir/boot/grub/grub.cfg
 # grub-mkrescue -o myos.iso isodir
 
-qemu-system-i386 -kernel target/x86_64-blog_os/debug/myos
+qemu-system-i386 -kernel target/x86_64-blog_os/debug/myos -m 4096
